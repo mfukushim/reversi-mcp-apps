@@ -45,8 +45,7 @@ export class MyMCP extends McpAgent<Env, State, {}> {
         contents: [{
           uri: resourceUri,
           mimeType: RESOURCE_MIME_TYPE,
-          // _meta: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
-          text: generateReversiHTMLFromState()  //  this.state.board, this.state.gameSession
+          text: generateReversiHTMLFromState()
         }]
       }
     })
@@ -111,8 +110,7 @@ export class MyMCP extends McpAgent<Env, State, {}> {
         description: "User move a stone",
         inputSchema: {
           move: z.string().describe('Where to place the black stone. Specify one of A1 to H8. Pass to PASS.'),
-          //  TODO 暗号化またはサイン要  つまり 公開鍵をAIに知られない方法で送らなければならない サインのみならAIに漏れる形でもよい? AIが嘘の公開鍵をMCPに送る可能性があるのでサインでもダメか。。
-          gameSession: z.string().optional(), //  TODO 通信時に使用
+          gameSession: z.string().optional(),
           locale: z.string().optional(),
         },
         _meta: { ui: { resourceUri } }
@@ -194,8 +192,7 @@ export class MyMCP extends McpAgent<Env, State, {}> {
         description: "Restore a game from a previous state",
         inputSchema: {
           state: ExportStateSchema.describe('Where to place the black stone. Specify one of A1 to H8. Pass to PASS.'),
-          //  TODO 暗号化またはサイン要  つまり 公開鍵をAIに知られない方法で送らなければならない サインのみならAIに漏れる形でもよい? AIが嘘の公開鍵をMCPに送る可能性があるのでサインでもダメか。。
-          gameSession: z.string().optional(), //  TODO 通信時に使用
+          gameSession: z.string().optional(),
         },
         _meta: { ui: { resourceUri } }
       },
@@ -238,15 +235,6 @@ export class MyMCP extends McpAgent<Env, State, {}> {
     } as CallToolResult
   }
 }
-
-/*
-const app = new Hono()
-
-app.mount('/sse', MyMCP.serveSSE('/sse').fetch, { replaceRequest: false })
-app.mount('/mcp', MyMCP.serve('/mcp').fetch, { replaceRequest: false} )
-
-export default app
-*/
 
 export default {
   fetch(request: Request, env: Env, ctx: ExecutionContext) {

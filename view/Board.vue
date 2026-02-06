@@ -55,7 +55,7 @@
     </div>
     <div v-else class="header">
       {{locale == 'ja-JP'?'ゲームセッションが終了したため盤面が無効です':'Board Disabled. Game session expired.'}}
-      <v-btn class="CmdBtn" @click="restoreGame"> {{locale == 'ja-JP'?'ここからゲームを再開する':'Restore Game from here'}}</v-btn>
+      <button class="CmdBtn" @click="restoreGame"> {{locale == 'ja-JP'?'ここからゲームを再開する':'Restore Game from here'}}</button>
     </div>
   </article>
 </template>
@@ -75,15 +75,6 @@ import type {Cell, Color, ExportState, State} from "../Def.ts";
 const app = ref<App | null>(null);
 const hostContext = ref<McpUiHostContext | undefined>();
 
-
-// interface ReversiState {
-//   board: string
-//   to: string
-//   legal: string[]
-//   black: number
-//   white: number
-// }
-
 interface PlayResult {
   ok: boolean
   error?: string
@@ -92,15 +83,6 @@ interface PlayResult {
   placedIdx?: number
   flips?: number[]
 }
-
-// const props = defineProps<{
-//   initialState?: { board: string; to: string }
-//   gameSession?: string
-// }>()
-
-// const emit = defineEmits<{
-//   click: [coord: string, result: PlayResult, state: ReversiState]
-// }>()
 
 class ReversiEngine {
   private b: Cell[] = []
@@ -116,8 +98,7 @@ class ReversiEngine {
   }
 
   import(state: { board: string; to: string }) {
-    remoteLog('import',state)
-    if (!state || typeof state.board !== 'string' || state.board.length !== 64) {
+    if (!state || state.board.length !== 64) {
       throw new Error('board は64文字の文字列である必要があります')
     }
     if (state.to !== 'B' && state.to !== 'W') {
@@ -259,7 +240,6 @@ function showToast(msg: string) {
 function onCell(coord: string) {
   if (done.value || clickDisabled.value) return // 選択操作後の盤面は無反応にする
 
-  remoteLog('onCell:', coord,state.value);
   const res = engine.playBlack(coord)
   if (!res.ok) {
     showToast(res.error || 'エラー')
@@ -269,7 +249,7 @@ function onCell(coord: string) {
   state.value = engine.export()
   animCoord.value = coord
 
-  clickCell(coord, res)
+  clickCell(coord)
 
   // アニメーション用のクラスをリセット
   setTimeout(() => {
@@ -294,51 +274,34 @@ async function importBoard() {
   try {
     if (!app.value) throw new Error('App not found')
     const result:CallToolResult = await app.value.callServerTool({ name: "get-board", arguments: {} });
-    await remoteLog("get-board result:", result);
-    // const res = result.content.find(c => c.type === 'text');
     return result.structuredContent as unknown as State;
-/*
-    if (result.structuredContent?.board) {
-      state.value = engine.import(result.structuredContent.board as unknown as ExportState)
-    }
-*/
   } catch (e) {
     await remoteLog('Import error:', e)
     state.value = engine.init()
   }
 }
 
-async function clickCell(coord:string,res:PlayResult) {
+async function clickCell(coord:string) {
   try {
-    await remoteLog('Clicked:', coord,res);
     if (!app.value) throw new Error('App not found')
-    const result:CallToolResult = await app.value.callServerTool({
+    await app.value.callServerTool({
       name: "select-user", arguments: { move: coord,gameSession:gameSession.value} });
-    await remoteLog("select-user result:", result);
     const cap = app.value.getHostCapabilities()
     if (cap?.updateModelContext) {
-      const result2 = await app.value.updateModelContext(
+      await app.value.updateModelContext(
           {content:[{type:'text',text:'The user has already placed the next stone, so the board state has changed. User placed B on ' + coord
                   +'. Assistant\'s turn now. Next, Please devise a position for the next white stone and put a white stone by select-assistant(e.g., {"move":"A1"}).'
                   +` The current board state is "${JSON.stringify(state.value)}".`}]})
-      await remoteLog("select-user result2:", result2);
-      const result3 = await app.value.sendMessage({
+      await app.value.sendMessage({
         role: "user",
         content: [{type:'text',text:locale.value === 'ja-JP' ?`黒を${coord}に置きました。あなたの手番です。`:`I placed B on ${coord}. Your turn now.`}]
       })
-      await remoteLog("select-user result3:", result3);
     } else {
-      const result3 = await app.value.sendMessage({
+      await app.value.sendMessage({
         role: "user",
         content: [{type:'text',text:locale.value === 'ja-JP' ?`黒を${coord}に置きました。あなたの手番です。\n現在の盤面:"${JSON.stringify(state.value)}"`:`I placed B on ${coord}. Your turn now.\nThe current board state is "${JSON.stringify(state.value)}".`}]
       })
-      await remoteLog("select-user result3:", result3);
-
     }
-    // const res = result.content.find(c => c.type === 'text');
-    // if (res) {
-    //   state.value = JSON.parse(res.text);
-    // }
 
     // 正常に実行完了したらクリックを無効化
     clickDisabled.value = true
@@ -375,14 +338,10 @@ onMounted(async () => {
   const instance = new App({ name: "Reversi App", version: "1.0.0" });
   instance.ontoolinput = async (params) => {
     console.info("Received tool call input:", params);
-    await remoteLog('toolinput:', params);
   };
 
   instance.ontoolresult = async (result) => {
-    console.info("Received tool call result:", result);
-    // serverTime.value = extractTime(result);
-    await remoteLog('toolresult:', result);
-    // const res = result.content.find(c => c.type === 'text');
+    // console.info("Received tool call result:", result);
     if (result.structuredContent?.board) {
       state.value = engine.import(result.structuredContent.board as unknown as ExportState)
       recentGameState.value = result.structuredContent.board as unknown as ExportState
@@ -392,42 +351,24 @@ onMounted(async () => {
     }
     const currentState = await importBoard()
     if(currentState && currentState.gameSession !== result.structuredContent?.gameSession) {
-      await remoteLog('gameSession expired:', result.structuredContent?.gameSession);
       gameDisabled.value = true
     }
   };
 
   instance.ontoolcancelled = async (params) => {
     console.info("Tool call cancelled:", params.reason);
-    await remoteLog('toolcancelled:', params);
   };
 
   instance.onerror = console.error;
 
   instance.onhostcontextchanged = async (params) => {
     hostContext.value = { ...hostContext.value, ...params };
-    await remoteLog('hostContextChanged:', params);
   };
 
   await instance.connect();
   app.value = instance;
   hostContext.value = instance.getHostContext();
 
-  await remoteLog('hostContext:', JSON.stringify(hostContext.value,null,2));
-
-  // await importBoard();
-/*
-  try {
-    if (props.initialState) {
-      state.value = engine.import({ board: props.initialState.board, to: props.initialState.to })
-    } else {
-      state.value = engine.init()
-    }
-  } catch (e) {
-    console.error('Import error:', e)
-    state.value = engine.init()
-  }
-*/
 })
 </script>
 

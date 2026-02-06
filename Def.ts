@@ -1,7 +1,6 @@
 import {z} from "zod";
 
-// export type Color = "B" | "W";
-// export type Cell = "." | "B" | "W";
+//  def
 
 const ColorSchema = z.enum(["B", "W"]);
 export type Color = z.infer<typeof ColorSchema>;
@@ -17,14 +16,6 @@ export const ExportStateSchema = z.object({
 });
 
 export type ExportState = z.infer<typeof ExportStateSchema>;
-
-// export interface ExportState {
-//   board: string;          // 64文字 (A1..H1, A2..H2, ... A8..H8)
-//   to: Color;              // 次手番
-//   legal: string[];        // 次手番の合法手 (座標)
-//   black: number;          // 黒の石数
-//   white: number;          // 白の石数
-// }
 
 export type State = {
   board: ExportState;

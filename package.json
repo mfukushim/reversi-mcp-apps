@@ -8,10 +8,6 @@
     "url": "https://github.com/mfukushim/reversi-mcp-apps"
   },
   "license": "MIT",
-  "main": "dist/server.js",
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
@@ -48,15 +44,5 @@
     "vite": "^6.0.0",
     "vite-plugin-singlefile": "^2.3.0",
     "wrangler": "^4.61.1"
-  },
-  "types": "dist/server.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/server.d.ts",
-      "default": "./dist/server.js"
-    }
-  },
-  "bin": {
-    "reversi-mcp-apps": "dist/index.js"
   }
 }
