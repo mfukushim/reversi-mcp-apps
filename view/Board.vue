@@ -55,7 +55,9 @@
     </div>
     <div v-else class="header">
       {{locale == 'ja-JP'?'ゲームセッションが終了したため盤面が無効です':'Board Disabled. Game session expired.'}}
+<!--
       <button class="CmdBtn" @click="restoreGame"> {{locale == 'ja-JP'?'ここからゲームを再開する':'Restore Game from here'}}</button>
+-->
     </div>
   </article>
 </template>
@@ -317,7 +319,10 @@ async function restoreGame() {
   done.value = false
   clickDisabled.value = false
   if(recentGameState.value) state.value = engine.import(recentGameState.value)
-  await app.value.callServerTool({ name: "restore-game", arguments: { state: state.value } });
+  await remoteLog('Restored game1:', state.value,gameSession.value)
+  //  TODO ここで止まる?
+  const res = await app.value.callServerTool({ name: "restore-game", arguments: { state: state.value,gameSession:gameSession.value } });
+  await remoteLog('Restored game2:', res)
 }
 
 watchEffect(() => {

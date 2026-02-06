@@ -113,7 +113,7 @@ export class MyMCP extends McpAgent<Env, State, {}> {
           gameSession: z.string().optional(),
           locale: z.string().optional(),
         },
-        _meta: { ui: { resourceUri } }
+        _meta: {}
       },
       ({move,gameSession,locale},extra: RequestHandlerExtra<ServerRequest, ServerNotification>) => {
         if (locale) {
@@ -194,13 +194,16 @@ export class MyMCP extends McpAgent<Env, State, {}> {
           state: ExportStateSchema.describe('Where to place the black stone. Specify one of A1 to H8. Pass to PASS.'),
           gameSession: z.string().optional(),
         },
-        _meta: { ui: { resourceUri } }
+        _meta: { }
       },
       ({state,gameSession},extra: RequestHandlerExtra<ServerRequest, ServerNotification>) => {
+        console.log('gameSession:',gameSession)
+        console.log('state:',JSON.stringify(state,null,2))
         console.log('extra:',JSON.stringify(extra,null,2),gameSession)
         try {
           const engine = new ReversiEngine()
           engine.import(state)
+          this.setState({board:{...state},gameSession:gameSession || this.state.gameSession})
         } catch (e: any) {
           console.log('error:', e.toString())
         }
