@@ -11,3 +11,4 @@ yarn-error.log*
 .vscode/*
 /.wrangler/
 /dist_view/
+/tools/

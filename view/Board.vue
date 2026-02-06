@@ -5,10 +5,11 @@
       paddingBottom: hostContext.safeAreaInsets.bottom + 'px',
       paddingLeft: hostContext.safeAreaInsets.left + 'px',
       width: '600px',
-      height: '650px'
+      height: getBoardHeight
     }">
+    <div v-if="!gameDisabled">
     <div class="header">
-      <div class="badge">手番: {{ turnText }}</div>
+      <div class="badge">{{locale == 'ja-JP'?'手番':'Turn'}}: {{ turnText }}</div>
       <div class="controls">
         <button class="CmdBtn" type="button" title="合法手が無いときのみ有効" @click="onCell('PASS')">PASS</button>
 <!--
@@ -36,7 +37,7 @@
         <div
           v-for="(ch, i) in state.board"
           :key="i"
-          class="cell"
+          :class="['cell', { disabled: clickDisabled }]"
           :data-coord="getCoord(i)"
           tabindex="0"
           :aria-label="getCoord(i)"
@@ -51,6 +52,11 @@
     </div>
 
     <div :class="['toast', { show: toastVisible }]">{{ toastMessage }}</div>
+    </div>
+    <div v-else class="header">
+      {{locale == 'ja-JP'?'ゲームセッションが終了したため盤面が無効です':'Board Disabled. Game session expired.'}}
+      <v-btn class="CmdBtn" @click="restoreGame"> {{locale == 'ja-JP'?'ここからゲームを再開する':'Restore Game from here'}}</v-btn>
+    </div>
   </article>
 </template>
 
@@ -64,18 +70,19 @@ import {
   type McpUiHostContext,
 } from "@modelcontextprotocol/ext-apps";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type {Cell, Color, ExportState, State} from "../Def.ts";
 
 const app = ref<App | null>(null);
 const hostContext = ref<McpUiHostContext | undefined>();
 
 
-interface ReversiState {
-  board: string
-  to: string
-  legal: string[]
-  black: number
-  white: number
-}
+// interface ReversiState {
+//   board: string
+//   to: string
+//   legal: string[]
+//   black: number
+//   white: number
+// }
 
 interface PlayResult {
   ok: boolean
@@ -96,8 +103,8 @@ interface PlayResult {
 // }>()
 
 class ReversiEngine {
-  private b: string[] = []
-  private to: string = 'B'
+  private b: Cell[] = []
+  private to: Color = 'B'
 
   init() {
     this.b = Array(64).fill('.')
@@ -116,7 +123,7 @@ class ReversiEngine {
     if (state.to !== 'B' && state.to !== 'W') {
       throw new Error("to は 'B' または 'W'")
     }
-    const arr = []
+    const arr: Cell[] = []
     for (let i = 0; i < 64; i++) {
       const ch = state.board[i]
       if (ch !== '.' && ch !== 'B' && ch !== 'W') throw new Error('board に不正な文字があります')
@@ -127,7 +134,7 @@ class ReversiEngine {
     return this.export()
   }
 
-  export(): ReversiState {
+  export(): ExportState {
     const { black, white } = this.counts()
     return { board: this.b.join(''), to: this.to, legal: this.legalMoves(this.to), black, white }
   }
@@ -210,15 +217,25 @@ class ReversiEngine {
 }
 
 const engine = new ReversiEngine()
-const state = ref<ReversiState>({} as ReversiState)
+const state = ref<ExportState>({} as ExportState)
+const gameSession = ref<string>('')
 const done = ref(false)
+const locale = ref('en')
+const clickDisabled = ref(false)
 const animCoord = ref<string>('')
 const toastVisible = ref(false)
 const toastMessage = ref('')
+const gameDisabled = ref(false)
+const recentGameState = ref<ExportState|undefined>(undefined)
 
 const turnText = computed(() => {
   return state.value.to === 'B' ? '黒(B)' : '白(W)'
 })
+
+const getBoardHeight = computed(() => {
+  return gameDisabled.value ? '50px': '650px'
+})
+
 
 const topGuides = Array.from({ length: 8 }, (_, i) => String.fromCharCode(65 + i))
 const leftGuides = Array.from({ length: 8 }, (_, i) => i + 1)
@@ -240,7 +257,7 @@ function showToast(msg: string) {
 }
 
 function onCell(coord: string) {
-  if (done.value) return // 選択操作後の盤面は無反応にする
+  if (done.value || clickDisabled.value) return // 選択操作後の盤面は無反応にする
 
   remoteLog('onCell:', coord,state.value);
   const res = engine.playBlack(coord)
@@ -279,9 +296,12 @@ async function importBoard() {
     const result:CallToolResult = await app.value.callServerTool({ name: "get-board", arguments: {} });
     await remoteLog("get-board result:", result);
     // const res = result.content.find(c => c.type === 'text');
-    if (result.structuredContent) {
-      state.value = engine.import(result.structuredContent as unknown as ReversiState)
+    return result.structuredContent as unknown as State;
+/*
+    if (result.structuredContent?.board) {
+      state.value = engine.import(result.structuredContent.board as unknown as ExportState)
     }
+*/
   } catch (e) {
     await remoteLog('Import error:', e)
     state.value = engine.init()
@@ -292,26 +312,49 @@ async function clickCell(coord:string,res:PlayResult) {
   try {
     await remoteLog('Clicked:', coord,res);
     if (!app.value) throw new Error('App not found')
-    const result:CallToolResult = await app.value.callServerTool({ name: "select-user", arguments: { move: coord } });
+    const result:CallToolResult = await app.value.callServerTool({
+      name: "select-user", arguments: { move: coord,gameSession:gameSession.value} });
     await remoteLog("select-user result:", result);
-    const result2 = await app.value.updateModelContext(
-        {content:[{type:'text',text:'The user has already placed the next stone, so the board state has changed. User placed B on ' + coord
-                +'. Assistant\'s turn now. Next, Please devise a position for the next white stone and put a white stone by select-assistant(e.g., {"move":"A1"}).'
-                +` The current board state is "${JSON.stringify(state.value)}".`}]})
-    await remoteLog("select-user result2:", result2);
-    const result3 = await app.value.sendMessage({
+    const cap = app.value.getHostCapabilities()
+    if (cap?.updateModelContext) {
+      const result2 = await app.value.updateModelContext(
+          {content:[{type:'text',text:'The user has already placed the next stone, so the board state has changed. User placed B on ' + coord
+                  +'. Assistant\'s turn now. Next, Please devise a position for the next white stone and put a white stone by select-assistant(e.g., {"move":"A1"}).'
+                  +` The current board state is "${JSON.stringify(state.value)}".`}]})
+      await remoteLog("select-user result2:", result2);
+      const result3 = await app.value.sendMessage({
         role: "user",
-        content: [{type:'text',text:'I placed B on ' + coord +'. Your turn now.'}]
-    })
-    await remoteLog("select-user result3:", result3);
+        content: [{type:'text',text:locale.value === 'ja-JP' ?`黒を${coord}に置きました。あなたの手番です。`:`I placed B on ${coord}. Your turn now.`}]
+      })
+      await remoteLog("select-user result3:", result3);
+    } else {
+      const result3 = await app.value.sendMessage({
+        role: "user",
+        content: [{type:'text',text:locale.value === 'ja-JP' ?`黒を${coord}に置きました。あなたの手番です。\n現在の盤面:"${JSON.stringify(state.value)}"`:`I placed B on ${coord}. Your turn now.\nThe current board state is "${JSON.stringify(state.value)}".`}]
+      })
+      await remoteLog("select-user result3:", result3);
+
+    }
     // const res = result.content.find(c => c.type === 'text');
     // if (res) {
     //   state.value = JSON.parse(res.text);
     // }
+
+    // 正常に実行完了したらクリックを無効化
+    clickDisabled.value = true
   } catch (e) {
     console.error('Import error:', e)
     state.value = engine.init()
   }
+}
+
+async function restoreGame() {
+  if (!app.value) return
+  gameDisabled.value = false
+  done.value = false
+  clickDisabled.value = false
+  if(recentGameState.value) state.value = engine.import(recentGameState.value)
+  await app.value.callServerTool({ name: "restore-game", arguments: { state: state.value } });
 }
 
 watchEffect(() => {
@@ -325,27 +368,45 @@ watchEffect(() => {
   if (ctx?.styles?.css?.fonts) {
     applyHostFonts(ctx.styles.css.fonts);
   }
+  locale.value = ctx?.locale || 'en'
 });
 
 onMounted(async () => {
   const instance = new App({ name: "Reversi App", version: "1.0.0" });
-  instance.ontoolinput = (params) => {
+  instance.ontoolinput = async (params) => {
     console.info("Received tool call input:", params);
+    await remoteLog('toolinput:', params);
   };
 
-  instance.ontoolresult = (result) => {
+  instance.ontoolresult = async (result) => {
     console.info("Received tool call result:", result);
     // serverTime.value = extractTime(result);
+    await remoteLog('toolresult:', result);
+    // const res = result.content.find(c => c.type === 'text');
+    if (result.structuredContent?.board) {
+      state.value = engine.import(result.structuredContent.board as unknown as ExportState)
+      recentGameState.value = result.structuredContent.board as unknown as ExportState
+    }
+    if (result.structuredContent?.gameSession) {
+      gameSession.value = result.structuredContent.gameSession as string
+    }
+    const currentState = await importBoard()
+    if(currentState && currentState.gameSession !== result.structuredContent?.gameSession) {
+      await remoteLog('gameSession expired:', result.structuredContent?.gameSession);
+      gameDisabled.value = true
+    }
   };
 
-  instance.ontoolcancelled = (params) => {
+  instance.ontoolcancelled = async (params) => {
     console.info("Tool call cancelled:", params.reason);
+    await remoteLog('toolcancelled:', params);
   };
 
   instance.onerror = console.error;
 
-  instance.onhostcontextchanged = (params) => {
+  instance.onhostcontextchanged = async (params) => {
     hostContext.value = { ...hostContext.value, ...params };
+    await remoteLog('hostContextChanged:', params);
   };
 
   await instance.connect();
@@ -354,7 +415,7 @@ onMounted(async () => {
 
   await remoteLog('hostContext:', JSON.stringify(hostContext.value,null,2));
 
-  await importBoard();
+  // await importBoard();
 /*
   try {
     if (props.initialState) {
@@ -448,8 +509,16 @@ onMounted(async () => {
   background: linear-gradient(135deg, #2f7d32, #266628);
   border-radius: 8px;
   box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.15);
-  cursor: pointer;
   outline: none;
+}
+
+.cell:not(.disabled) {
+  cursor: pointer;
+}
+
+.cell.disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .cell:hover {

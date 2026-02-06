@@ -1,16 +1,13 @@
 import {McpAgent} from "agents/mcp";
 import {McpServer} from "@modelcontextprotocol/sdk/server/mcp.js";
 import {generateReversiHTMLFromState} from "./rule-logic/boardDrawer.js";
-import {type ExportState, ReversiEngine} from "./rule-logic/reversi.js";
+import {ReversiEngine} from "./rule-logic/reversi.js";
 import {z} from "zod";
 import {registerAppResource, registerAppTool, RESOURCE_MIME_TYPE} from "@modelcontextprotocol/ext-apps/server";
 import type {CallToolResult, ServerNotification, ServerRequest} from "@modelcontextprotocol/sdk/types.js";
 import type {RequestHandlerExtra} from "@modelcontextprotocol/sdk/shared/protocol.js";
+import {ExportStateSchema, type State} from "../Def.ts";
 
-type State = {
-  board: ExportState;
-  gameSession: string;
-};
 
 const resourceUri = "ui://reversi-mcp-ui/game-board";
 // Define our MCP agent with tools
@@ -29,6 +26,15 @@ export class MyMCP extends McpAgent<Env, State, {}> {
   async onStateUpdate(state: State) {
     console.log("state updated", state);
   }
+
+  boardInfo() {
+    return this.lang(
+      `current board: ${JSON.stringify(this.state.board)}.\n${this.state.board.to === "W" ? 'Assistant\'s turn. Use select-assistant to place the pieces.' : 'User\'s turn. Wait for the user\'s choice.'}`,
+    `現在の盤面: ${JSON.stringify(this.state.board)}\n${this.state.board.to === "W" ? 'Assistantの番です。select-assistantを使ってコマを置いてください。' : 'Userの番です。ユーザの選択を待ってください。'}`)
+  }
+
+  noRepresents = this.lang('The board has already been presented to the user, so the assistant does not need to re-present it.',
+    '盤面はすでにユーザーに提示されているため、アシスタントが再度提示する必要はありません。')
 
   async init() {
     registerAppResource(this.server,'game-board',resourceUri,{
@@ -82,7 +88,8 @@ export class MyMCP extends McpAgent<Env, State, {}> {
         engine.init()
         this.state.board = engine.export()
         this.setState({...this.state});
-        return this.makeMessage(`Started Reversi. current board: ${JSON.stringify(this.state.board)}.  ${this.state.board.to === "W" ? 'Assistant\'s turn.' : 'User\'s turn.'} The board has already been presented to the user, so the assistant does not need to re-present it.`)
+        return this.makeMessage(
+          this.lang('Started Reversi. ','リバーシを開始しました。')+this.boardInfo()+this.noRepresents)
       },
     );
     registerAppTool(this.server,
@@ -94,7 +101,7 @@ export class MyMCP extends McpAgent<Env, State, {}> {
       },
       (extra: RequestHandlerExtra<ServerRequest, ServerNotification>) => {
         console.log('extra:',JSON.stringify(extra,null,2))
-        return this.makeMessage(`current board: ${JSON.stringify(this.state.board)}.  ${this.state.board.to === "W" ? 'Assistant\'s turn.' : 'User\'s turn.'} The board has already been presented to the user, so the assistant does not need to re-present it.`)
+        return this.makeMessage(this.boardInfo()+this.noRepresents)
       },
     );
     registerAppTool(this.server,
@@ -106,11 +113,20 @@ export class MyMCP extends McpAgent<Env, State, {}> {
           move: z.string().describe('Where to place the black stone. Specify one of A1 to H8. Pass to PASS.'),
           //  TODO 暗号化またはサイン要  つまり 公開鍵をAIに知られない方法で送らなければならない サインのみならAIに漏れる形でもよい? AIが嘘の公開鍵をMCPに送る可能性があるのでサインでもダメか。。
           gameSession: z.string().optional(), //  TODO 通信時に使用
+          locale: z.string().optional(),
         },
         _meta: { ui: { resourceUri } }
       },
-      ({move},extra: RequestHandlerExtra<ServerRequest, ServerNotification>) => {
-        let m = ''
+      ({move,gameSession,locale},extra: RequestHandlerExtra<ServerRequest, ServerNotification>) => {
+        if (locale) {
+          this.locale = locale;
+        }
+        console.log('locale:',this.locale)
+        console.log('gameSession:',gameSession)
+        if(this.state.gameSession !== gameSession)
+          return this.makeMessage(this.lang('Game session mismatch. Please try again.', 'ゲームセッションが一致しません。もう一度お試しください。'))
+
+        let m = '';
         console.log('extra:',JSON.stringify(extra,null,2))
         try {
           const engine = new ReversiEngine()
@@ -121,15 +137,24 @@ export class MyMCP extends McpAgent<Env, State, {}> {
             this.setState({...this.state});
           } else {
             console.log('ng:', res.error)
-            return this.makeMessage((move === "PASS" ? 'User made an incorrect choice. Attempting to pass despite having a legal move' : 'User made an incorrect choice. User tried to place ' + this.state.board.to + ' on ' + move) + '. error message is "' + res.error + '"')
+            return this.makeMessage((move === "PASS" ?
+              this.lang('User made an incorrect choice. Attempting to pass despite having a legal move','ユーザーは誤った選択をしました。合法的な動きがあるにもかかわらずパスしようとしています。')
+              : this.lang('User made an incorrect choice. User tried to place ' + this.state.board.to + ' on ' + move,`ユーザーは間違った選択をしました。ユーザーは${move}へ${this.state.board.to === "W" ? '白石' : '黒石'}を置こうとしました。`))
+              + '. error message is "' + res.error + '"')
           }
-          const assistantTurn = ' Assistant\'s turn now. Next, Please devise a position for the next white stone and put a white stone by select-assistant(e.g., {"move":"A1"}).'
-          m = res.pass ? 'User passed.'+assistantTurn : res.reset ? 'User reset the game. User\'s turn now.' : 'The user has already placed the next stone, so the board state has changed. User placed B on ' + move +'. ' +assistantTurn
+          const assistantTurn = this.lang(' Assistant\'s turn now. Next, Please devise a position for the next white stone and put a white stone by select-assistant(e.g., {"move":"A1"}).',
+            'Assistantのターンです。次に白石を置く場所を設計し、select-assistantで白石を置くようにしてください（例：{"move":"A1"}）。')
+          m = res.pass ?
+              this.lang('User passed.','Userはパスしました。')+assistantTurn :
+            res.reset ?
+              this.lang('User reset the game. User\'s turn now.','Userはゲームをリセットしました。Userのターンです。') :
+              this.lang('The user has already placed the next stone, so the board state has changed. User placed B on ' + move +'. ' +assistantTurn,
+                `ユーザーは次の石をすでに置きました。盤面の状態は変更されました。ユーザーは${move}へ${this.state.board.to === "W" ? '白石' : '黒石'}を置きました。` +assistantTurn)
         } catch (e: any) {
           console.log('error:', e.toString())
           return {content: [{type: "text", text: `error: ${e.message}`, annotations: {audience: ["assistant"],}}]}
         }
-        return this.makeMessage(`${m} The current board state is "${JSON.stringify(this.state.board)}". The board has already been presented to the user, so the assistant does not need to re-present it.`)
+        return this.makeMessage(`${m}\n${this.boardInfo()} ${this.noRepresents}`)
       }
     );
     registerAppTool(this.server,
@@ -153,33 +178,54 @@ export class MyMCP extends McpAgent<Env, State, {}> {
             this.setState({...this.state});
           } else {
             console.log('ng:', res.error)
-            return this.makeMessage(`The choice is incorrect. ${res.error}` + `. current board: ${JSON.stringify(this.state.board)}.  ${this.state.board.to === "W" ? 'Assistant must place the white stone using "select-assistant".' : 'User\'s turn.'}`)
+            return this.makeMessage(`${this.lang('The choice is incorrect.','選択誤りです。')} ${res.error}\n${this.boardInfo()} ${this.noRepresents}`)
           }
         } catch (e: any) {
           console.log('error:', e.toString())
           return {content: [{type: "text", text: `error: ${e.message}`, annotations: {audience: ["assistant"],}}]}
         }
-        return this.makeMessage(`Board updated. Please do not repost the game board as it has already been shown to the user. current board: ${JSON.stringify(this.state.board)}.  ${this.state.board.to === "W" ? 'Assistant must place the white stone using "select-assistant".' : 'User\'s turn.'}`)
+        return this.makeMessage(`${this.lang('Board updated.')}\n${this.boardInfo()} ${this.noRepresents}`)
       }
     )
+    registerAppTool(this.server,
+      "restore-game",
+      {
+        title: "Restore game",
+        description: "Restore a game from a previous state",
+        inputSchema: {
+          state: ExportStateSchema.describe('Where to place the black stone. Specify one of A1 to H8. Pass to PASS.'),
+          //  TODO 暗号化またはサイン要  つまり 公開鍵をAIに知られない方法で送らなければならない サインのみならAIに漏れる形でもよい? AIが嘘の公開鍵をMCPに送る可能性があるのでサインでもダメか。。
+          gameSession: z.string().optional(), //  TODO 通信時に使用
+        },
+        _meta: { ui: { resourceUri } }
+      },
+      ({state,gameSession},extra: RequestHandlerExtra<ServerRequest, ServerNotification>) => {
+        console.log('extra:',JSON.stringify(extra,null,2),gameSession)
+        try {
+          const engine = new ReversiEngine()
+          engine.import(state)
+        } catch (e: any) {
+          console.log('error:', e.toString())
+        }
+
+        return this.makeMessage(`${this.lang('Game is restart.')}\n${this.boardInfo()} ${this.noRepresents}`)
+      }
+    );
+
+  }
+
+  locale = 'en';
+
+  private lang(message:string,messageJ?:string) {
+    if(this.locale === 'ja-JP') {
+      return messageJ || message;
+    }
+    return message;
   }
 
   private makeMessage(message: string) {
     return {
       content: [
-        // createUIResource({
-        //   uri: "ui://reversi-mcp-ui/game-board",
-        //   content: {
-        //     type: "rawHtml",
-        //     htmlString: generateReversiHTMLFromState(this.state.board, this.state.gameSession),
-        //   },
-        //   encoding: "text",
-        //   resourceProps: {
-        //     annotations: {
-        //       audience: ["user"],
-        //     },
-        //   },
-        // }),
         {
           type: "text",
           text: message,
@@ -188,7 +234,7 @@ export class MyMCP extends McpAgent<Env, State, {}> {
           },
         }
       ],
-      structuredContent: this.state.board as any
+      structuredContent: this.state as any
     } as CallToolResult
   }
 }
