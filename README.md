@@ -21,28 +21,19 @@ The structure is relatively simple, so we believe it can be used as a reference 
 
 ## Available MCP clients
 
-Currently, there is no MCP client that fully supports MCP-UI UI Actions, so while my Avatar-Shell is easy to understand, there are still many unstable aspects.
-nanobot.ai supports UI Actions, so the screen will scroll, but you can play by clicking.  
+Currently, we have confirmed that it works with Claude Desktop for Windows.  
+Since it complies with the MCP Apps specifications, it is likely to work with clients that support MCP Apps.  
+Avatar-Shell will also be compatible with MCP Apps soon.  
 
-- [Avatar-Shell](https://github.com/mfukushim/avatar-shell)
-- [nanobot.ai](https://www.nanobot.ai/)  
 
-The game can be played with the following MCP clients, except for the stone clicking operation. Instead of clicking, you can specify the position of the stone to be placed by conversation.
-
-- [Goose](https://github.com/block/goose/)
-- [Smithery.ai](https://smithery.ai/server/@mfukushim/reversi-mcp-ui)
-
-I believe that once the implementation of UI Actions is finalized, it will be possible to operate these MCP clients by clicking.
-
-> Note: This MCP server outputs HTML data using the ui:// schema for each move. If the MCP client function uses LLM to read the ui: tag, the AI may use a large amount of tokens.  
-> When you first start using it, please check for unexpected token consumption.
+> Note: This MCP server outputs HTML data using the ui:// schema for each screen and each move. When you first start using it, please check for unexpected token consumption.  
 
 
 ## Get started
 
 #### Public Server
 
-Reversi MCP-UI is built on the MCPAgent mechanism of CloudFlare AI Agent and supports Streamable-http connections.
+Reversi MCP Apps is built on the MCPAgent mechanism of CloudFlare AI Agent and supports Streamable-http connections.
 
 A demo using Cloudflare workers is available below.
 
@@ -53,7 +44,7 @@ Please configure the following MCP settings on each MCP client.
   "mcpServers": {
     "reversi": {
       "type": "streamable-http",
-      "url": "https://reversi-mcp-ui.daisycodes.workers.dev/mcp"
+      "url": "https://reversi-mcp-apps.daisycodes.workers.dev"
     }
   }
 }
@@ -61,9 +52,6 @@ Please configure the following MCP settings on each MCP client.
 
 After successfully connecting Reversi, you can start playing by clicking "Play Reversi".  
 Depending on the AI's performance, you may also need to instruct the user to "It is your turn to play white pieces and place them in the best position."
-
-Smithery.ai  
-https://smithery.ai/server/@mfukushim/reversi-mcp-ui  
 
 (The public server may be shut down in the future.)  
 
@@ -107,18 +95,13 @@ Please configure the following MCP settings on each MCP client.
   In environments where UI Actions are implemented, you can play the game without using them. In that case, if you configure the MCP client so that the select-user tool function cannot be called, the AI will not be able to control the user turn.
 - select-assistant  
   Place the white stone (AI turn). The coordinates are A1-H8. If you have no choice but to pass your turn, call it with PASS.
+- restore-game  
+  Restoring a suspended game (currently being adjusted)
 
+#### Resource
 
-#### UI Actions
-
-Currently, many MCP clients have not implemented UI Actions or are in the process of implementing them. Currently, we expect the following behaviors in reversi MCP-UI.
-
-- tool select-user  
-  The user controlled the turn within the iframe screen (placed a black stone, passed, started a new game)   
-  It is assumed that this operation will be executed by the select-user tool on the reversi MCP without going through AI.
-  Extract the text from the execution result of select-user and send it to the AI as user input.  
-  Like "board updated. user put B at A1"  
-  This is expected to allow the AI to take some action (for example, knowing that the user has placed a black stone, then determining that the AI needs to operate a white stone and executing select-assistant).  
+- ui://reversi-mcp-ui/game-board  
+  Board html+js (Vue rendering)  
 
 
 ## Program Structure
@@ -130,27 +113,11 @@ This prevents the AI from cheating according to the rules, which is a common occ
 > - The AI may call the tool (select-user) on the user's turn without permission.
 > - The AI may be able to read the user's moves during their turn (this is not an issue in Reversi, but it is necessary to take measures in games where you hide your moves or cards).
 >
-> These issues are affected by the MCP specifications, MCP-UI specifications, and MCP client specifications, so it is unclear whether they can be resolved in the future.
-
-#### Rule Logic
-
-The equivalent JavaScript/Typescript reversi processing class ReversiEngine is located in src/rule-logic/reversi.ts and src/rule-logic/board.html.  
-The class ReversiEngine is the reversi rule processing that ChatGPT is instructed to generate.    
-Ideally, this would only be necessary within the MCP, but the same processing is also placed in the JavaScript within the HTML to determine the behavior when clicked.  
-The state of the board is determined in reversi.ts in MCP and is stored in the MCP session.  
-
-#### Board generation
-
-The board is drawn using html, css, and javascript in src/rule-logic/board.html.  
-The board information is displayed according to the information from the MCP, and simple motions are processed in response to user clicks.
-
-To set the board information in the html, simple template processing is performed in src/rule-logic/boardDrawer.ts.  
-
 
 #### MCP handling
 
-MCP and MCP-UI processing is done in src/index.ts.
-It is almost identical to the Cloudflare MCPAgent sample code.
+This client configuration is mostly compliant with @modelcontextprotocol/ext-apps.  
+It has been extended to work with Cloudflare MCPAgent.  
 
 ## Local Debugging and Deployment
 
@@ -169,4 +136,3 @@ pnpm run deploy # deploy to cloudflare workers
 
 ## Guide (Japanese)  
 
-https://note.com/marble_walkers/n/nfa9fe4bb68df  

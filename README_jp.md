@@ -19,28 +19,17 @@ TypeScriptの比較的シンプルな構成にしているので、同様のボ�
 
 ## 動作するMCPクライアント  
 
-MCP-UIのUI Actionsを完全にサポートするMCPクライアントが現時点存在しないため  
-今のところ拙作のAvatar-Shellでの動作がわかりやすいですが、まだ不安定な部分が多いです。  
-nanobot.aiではUI Actionに対応しているため、画面はスクロールしますがクリックでプレイが可能です。  
+現時点 Claude Desktop for Windowsでの動作を確認しています。  
+MCP Appsの仕様に準拠しているため、MCP Apps対応クライアントでは動く可能性が高いです。  
+Avatar-Shellも近日中にMCP Appsに対応予定です。  
 
-- [Avatar-Shell](https://github.com/mfukushim/avatar-shell)  
-- [nanobot.ai](https://www.nanobot.ai/) 
-
-石のクリック操作を除けば以下のMCPクライアントでもゲームプレイは可能です。クリックではなく手番で置く石の位置を会話で指定してください。  
-
-- [Goose](https://github.com/block/goose/)  
-- [Smithery.ai](https://smithery.ai/server/@mfukushim/reversi-mcp-ui)  
-
-これらのMCPクライアントでもUI Actionsの実装が固まればクリックでの操作が可能になると考えます。  
-
-> 注意 このMCPサーバーはui:// スキーマによるhtmlデータを一手ごとに出力します。 MCPクライアントの機能でui:タグをLLMが読み取る仕組みの場合、AIのトークンの使用量が多い場合があります。
-> 使い始め時は想定外のトークン消費がないか確認してください。
+> 注意 このMCPサーバーはui:// スキーマによるhtmlデータを一画面、一手ごとに出力します。 使い始め時は想定外のトークン消費がないか確認してください。
 
 ## はじめかた 
 
 #### 公開サーバー
 
-リバーシMCP-UIは、CloudFlare AI Agent のMCPAgentの仕組みの上で作られており、Streamable-http接続に対応しています。  
+リバーシMCP Appsは、CloudFlare AI Agent のMCPAgentの仕組みの上で作られており、Streamable-http接続に対応しています。  
 
 Cloudflare workersでのデモを以下で公開しています。  
 
@@ -51,7 +40,7 @@ Cloudflare workersでのデモを以下で公開しています。
   "mcpServers": {
     "reversi": {
       "type": "streamable-http",
-      "url": "https://reversi-mcp-ui.daisycodes.workers.dev/mcp"
+      "url": "https://reversi-mcp-apps.daisycodes.workers.dev"
     }
   }
 }
@@ -59,10 +48,6 @@ Cloudflare workersでのデモを以下で公開しています。
 > 注意: wrangler起動はDocker container内ではエラーになるようです。  
 
 正常にreversiを接続後、「リバーシをプレイしてください」で実行可能です。  
-AIの性能によっては「ユーザは黒の手番を指示します。アシスタントは白の手番を実行してください。」の指示も必要な場合があります。  
-
-Smithery.ai では外部サーバーとして以下で公開しています。  
-https://smithery.ai/server/@mfukushim/reversi-mcp-ui 
 
 (公開サーバーは状況によっては停止するかもしれません)
 
@@ -104,18 +89,14 @@ npm run dev # run wrangler local
   UI Actionsが実装されている環境では使わずにゲームできます。その場合MCPクライアントでselect-userのtool関数を呼び出せない設定にすればAIがユーザ手番を操作できません。    
 - select-assistant  
   白石(AI手番)の石を配置します。座標はA1-H8で指定します。手番をパスするしかないときは PASS で呼び出します。
+- restore-game  
+  中断したゲームを復元します(調整中)
 
 
-#### UI Actions
+#### Resource
 
-UI Actionは現時点では未実装、途中実装のMCPクライアントが多いです。現状reversi MCP-UIでは以下の挙動をすることを期待しています。
-
-- tool select-user  
-  ユーザがiframe画面内で手番を操作した(黒石を置いた。パスをした。ニューゲームした)  
-  その操作をreversi MCPへAIを介さずに select-userでtool実行することを想定しています。  
-  select-userの実行結果の中からtextを抽出して、それをuserの入力としてAIに送ります。
-  "board updated. user put B at A1" など  
-  これによりAIがなんらかのアクションを行うことを想定しています(ユーザが黒石を置いたことを知る。次にAIが白石を操作する必要がある判断をして select-assistant を実行する など)
+- ui://reversi-mcp-ui/game-board  
+  盤面html+js (Vueレンダリング)  
 
 
 ## プログラム構成  
@@ -128,27 +109,13 @@ MCPサーバー内でリバーシのルール処理を実行します。この�
 > - AIがユーザの手番のtool (select-user) を勝手に呼び出してしまう可能性
 > - AIがユーザの手番の操作を読み取ってしまう可能性 (リバーシでは問題になりませんが、打つ手や手札を隠すゲームなどでは対策要)  
 > 
-> これらはMCPの仕様やMCP-UIの仕様、MCPクライアントの仕様の影響を受けるため、将来的に解決可能かは不明です
 
-#### ルールロジック
-
-src/rule-logic/reversi.ts と src/rule-logic/board.html に同じjavascriptのリバーシ処理 class ReversiEngine を配置しています。
-class ReversiEngine はChatGPTに生成を指示したリバーシルール処理です。  
-本来MCP内だけでよいですが、クリック時の挙動判定をかねて同じ処理をhtml内javascriptにも置いています。  
-盤面の状態の決定はMCP内の reversi.ts で行われて、MCPのセッションに保持されます。
-
-#### 盤面生成
-
-盤面の描画処理は src/rule-logic/board.html 内のhtml,css,javascriptにて描画しています。  
-MCP側からの盤面情報に従って盤面情報を表示し、ユーザのクリックに対する簡易モーションを処理しています。  
-
-html内に盤面情報を設定するのにsrc/rule-logic/boardDrawer.ts で、簡易的なテンプレート加工処理を行っています。
 
 
 #### MCP処理部
 
-src/index.ts でMCP, MCP-UI処理を行っています。
-ほぼCloudflare MCPAgentのサンプルコードに準拠しています。
+ほぼ @modelcontextprotocol/ext-apps に準拠したクライアント構成です。  
+Cloudflare MCPAgent での動作するように拡張しています。  
 
 ## ローカルデバッグとデプロイ
 
@@ -167,4 +134,3 @@ pnpm run deploy # deploy to cloudflare workers
 
 ## ガイド  
 
-https://note.com/marble_walkers/n/nfa9fe4bb68df  
