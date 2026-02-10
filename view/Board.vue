@@ -88,6 +88,7 @@ interface PlayResult {
 class ReversiEngine {
   private b: Cell[] = []
   private to: Color = 'B'
+  private seq: number = 0
 
   init() {
     this.b = Array(64).fill('.')
@@ -95,10 +96,11 @@ class ReversiEngine {
     this.b[27] = 'W'; this.b[28] = 'B'
     this.b[35] = 'B'; this.b[36] = 'W'
     this.to = 'B'
+    this.seq = 0
     return this.export()
   }
 
-  import(state: { board: string; to: string }) {
+  import(state: { board: string; to: string, seq:number }) {
     if (!state || state.board.length !== 64) {
       throw new Error('board は64文字の文字列である必要があります')
     }
@@ -113,12 +115,13 @@ class ReversiEngine {
     }
     this.b = arr
     this.to = state.to
+    this.seq = state.seq
     return this.export()
   }
 
   export(): ExportState {
     const { black, white } = this.counts()
-    return { board: this.b.join(''), to: this.to, legal: this.legalMoves(this.to), black, white }
+    return { board: this.b.join(''), to: this.to, legal: this.legalMoves(this.to), black, white ,seq:this.seq}
   }
 
   opp(c: string) { return c === 'B' ? 'W' : 'B' }
@@ -183,6 +186,7 @@ class ReversiEngine {
       const leg = this.legalMoves(this.to)
       if (leg.length) return { ok: false, error: 'There are still legal options.' }
       this.to = this.opp(this.to)
+      this.seq++
       return { ok: true, pass: true }
     }
     if (!/^[A-H][1-8]$/.test(coord)) return { ok: false, error: 'Invalid coordinates.' }
@@ -194,6 +198,7 @@ class ReversiEngine {
     for (const j of flips) this.b[j] = this.to
     this.to = this.opp(this.to)
     if (this.legalMoves(this.to).length === 0) this.to = this.opp(this.to) // 相手に手が無ければ自動パス
+    this.seq++
     return { ok: true, placedIdx: i, flips }
   }
 }
@@ -201,6 +206,7 @@ class ReversiEngine {
 const engine = new ReversiEngine()
 const state = ref<ExportState>({} as ExportState)
 const gameSession = ref<string>('')
+const currentSeq = ref(0)
 const done = ref(false)
 const locale = ref('en')
 const clickDisabled = ref(false)
@@ -213,13 +219,6 @@ const recentGameState = ref<ExportState|undefined>(undefined)
 const turnText = computed(() => {
   return state.value.to === 'B' ? '黒(B)' : '白(W)'
 })
-
-// width: '600px',
-//     height: getBoardHeight
-
-// const getBoardHeight = computed(() => {
-//   return gameDisabled.value ? '50px': '650px'
-// })
 
 
 const topGuides = Array.from({ length: 8 }, (_, i) => String.fromCharCode(65 + i))
@@ -252,6 +251,7 @@ function onCell(coord: string) {
 
   state.value = engine.export()
   animCoord.value = coord
+  currentSeq.value = state.value.seq
 
   clickCell(coord)
 
@@ -344,7 +344,7 @@ watchEffect(() => {
 });
 
 onMounted(async () => {
-  await remoteLog('logStart:')
+  // await remoteLog('logStart:')
   const instance = new App({ name: "Reversi App", version: "1.0.0" },{},{autoResize:false});
   gameDisabled.value = false
   done.value = false
@@ -361,17 +361,23 @@ onMounted(async () => {
     if (result.structuredContent?.gameSession) {
       gameSession.value = result.structuredContent.gameSession as string
     }
+    const currentSeq = state.value.seq
     const currentState = await importBoard()
-    if(currentState?.gameSession && result.structuredContent?.gameSession && currentState.gameSession === result.structuredContent?.gameSession) {
+    if(currentState?.gameSession && result.structuredContent?.gameSession
+        && currentState.gameSession === result.structuredContent?.gameSession) {
       gameDisabled.value = false
       done.value = false
       clickDisabled.value = false
       state.value = engine.import(currentState.board)
-      recentGameState.value = currentState.board
-    } else {
-      console.log('Game session mismatch, disabling game',currentState?.gameSession,result.structuredContent?.gameSession)
-      gameDisabled.value = true
+      if (currentSeq === state.value.seq) {
+        recentGameState.value = currentState.board
+        return
+      }
     }
+    console.log('Game session mismatch, disabling game',
+        currentState?.gameSession,result.structuredContent?.gameSession,currentSeq,state.value.seq)
+    gameDisabled.value = true
+    app.value?.sendSizeChanged({ height:50 });
   };
 
   instance.ontoolcancelled = async (params) => {
@@ -387,17 +393,11 @@ onMounted(async () => {
   await instance.connect(undefined,{});
   app.value = instance;
   hostContext.value = instance.getHostContext();
-  console.log('hostContext:', hostContext.value)
   if (baseApp.value) {
     const { width, height } = baseApp.value?.getBoundingClientRect();
     console.log('width:', width, 'height:', height)
     app.value.sendSizeChanged({ height:Math.floor(height*1.2) });
   }
-  // const newMode = 'pip';
-  // if (hostContext.value?.availableDisplayModes?.includes(newMode)) {
-  //   const result = await app.value.requestDisplayMode({ mode: newMode });
-  //   console.log("fullscreen", result);
-  // }
 })
 </script>
 

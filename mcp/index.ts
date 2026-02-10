@@ -20,7 +20,8 @@ export class MyMCP extends McpAgent<Env, State, {}> {
 
   initialState: State = {
     board: new ReversiEngine().init(),
-    gameSession: crypto.randomUUID()
+    gameSession: crypto.randomUUID(),
+    currentSeq: 0,
   };
 
   async onStateUpdate(state: State) {
@@ -40,7 +41,6 @@ export class MyMCP extends McpAgent<Env, State, {}> {
     registerAppResource(this.server,'game-board',resourceUri,{
       mimeType: RESOURCE_MIME_TYPE
     },async () => {
-      console.log('current board:', this.state.board)
       return {
         contents: [{
           uri: resourceUri,
@@ -100,8 +100,8 @@ export class MyMCP extends McpAgent<Env, State, {}> {
           ui: { resourceUri }
         }
       },
-      (extra: RequestHandlerExtra<ServerRequest, ServerNotification>) => {
-        console.log('extra:',JSON.stringify(extra,null,2))
+      (_: RequestHandlerExtra<ServerRequest, ServerNotification>) => {
+        // console.log('extra:',JSON.stringify(extra,null,2))
         return this.makeMessage(this.boardInfo()+this.noRepresents)
       },
     );
@@ -117,17 +117,15 @@ export class MyMCP extends McpAgent<Env, State, {}> {
         },
         _meta: {}
       },
-      ({move,gameSession,locale},extra: RequestHandlerExtra<ServerRequest, ServerNotification>) => {
+      ({move,gameSession,locale},_: RequestHandlerExtra<ServerRequest, ServerNotification>) => {
         if (locale) {
           this.locale = locale;
         }
-        console.log('locale:',this.locale)
-        console.log('gameSession:',gameSession)
         if(this.state.gameSession !== gameSession)
           return this.makeMessage(this.lang('Game session mismatch. Please try again.', 'ゲームセッションが一致しません。もう一度お試しください。'))
 
         let m = '';
-        console.log('extra:',JSON.stringify(extra,null,2))
+        // console.log('extra:',JSON.stringify(extra,null,2))
         try {
           const engine = new ReversiEngine()
           engine.import(this.state.board)
@@ -169,8 +167,8 @@ export class MyMCP extends McpAgent<Env, State, {}> {
           ui: { resourceUri }
         }
       },
-      ({move},extra: RequestHandlerExtra<ServerRequest, ServerNotification>) => {
-        console.log('extra:',JSON.stringify(extra,null,2))
+      ({move},_: RequestHandlerExtra<ServerRequest, ServerNotification>) => {
+        // console.log('extra:',JSON.stringify(extra,null,2))
         try {
           const engine = new ReversiEngine()
           engine.import(this.state.board)
@@ -200,14 +198,14 @@ export class MyMCP extends McpAgent<Env, State, {}> {
         },
         _meta: { }
       },
-      ({state,gameSession},extra: RequestHandlerExtra<ServerRequest, ServerNotification>) => {
-        console.log('gameSession:',gameSession)
-        console.log('state:',JSON.stringify(state,null,2))
-        console.log('extra:',JSON.stringify(extra,null,2),gameSession)
+      ({state,gameSession},_: RequestHandlerExtra<ServerRequest, ServerNotification>) => {
+        // console.log('gameSession:',gameSession)
+        // console.log('state:',JSON.stringify(state,null,2))
+        // console.log('extra:',JSON.stringify(extra,null,2),gameSession)
         try {
           const engine = new ReversiEngine()
           engine.import(state)
-          this.setState({board:{...state},gameSession:gameSession || this.state.gameSession})
+          this.setState({board:{...state},gameSession:gameSession || this.state.gameSession,currentSeq:state.seq})
         } catch (e: any) {
           console.log('error:', e.toString())
         }

@@ -9,6 +9,7 @@ import type {Cell, Color, ExportState} from "../../Def.ts";
 export class ReversiEngine {
   private b: Cell[] = Array(64).fill(".");
   private to: Color = "B";
+  private seq: number = 0
 
   /** 標準初期配置で初期化 */
   init(): ExportState {
@@ -20,11 +21,12 @@ export class ReversiEngine {
     this.b[4 * 8 + 3] = "B";
     this.b[4 * 8 + 4] = "W";
     this.to = "B";
+    this.seq = 0
     return this.export();
   }
 
   /** 盤面・手番を外部から取り込む（検証 & 再計算） */
-  import(state: Pick<ExportState, "board" | "to">): ExportState {
+  import(state: Pick<ExportState, "board" | "to" | "seq">): ExportState {
     // 検証：長さ・文字種
     if (state.board.length !== 64) {
       throw new Error("board は 64 文字である必要があります");
@@ -42,6 +44,7 @@ export class ReversiEngine {
     }
     this.b = arr;
     this.to = state.to;
+    this.seq = state.seq
     // 合法手/カウントは自前で再計算
     return this.export();
   }
@@ -50,7 +53,7 @@ export class ReversiEngine {
   export(): ExportState {
     const legal = this.legalMoves(this.to);
     const {black, white} = this.counts();
-    return {board: this.b.join(""), to: this.to, legal, black, white};
+    return {board: this.b.join(""), to: this.to, legal, black, white,seq:this.seq};
   }
 
   /** 黒の着手 */
@@ -76,6 +79,7 @@ export class ReversiEngine {
       const leg = this.legalMoves(this.to);
       if (leg.length) return {ok: false, error: "まだ合法手があります"};
       this.to = this.opp(this.to);
+      this.seq++
       return {ok: true, pass: true};
     }
     if (!/^[A-H][1-8]$/.test(coord)) return {ok: false, error: "座標が不正です"};
@@ -84,7 +88,7 @@ export class ReversiEngine {
 
     const flips = this.flips(i, this.to);
     if (!flips.length) {
-      console.log('board:', this.b, to, coord)
+      // console.log('board:', this.b, to, coord)
       return {ok: false, error: "取れません"};
     }
 
@@ -98,6 +102,7 @@ export class ReversiEngine {
     if (this.legalMoves(this.to).length === 0) {
       this.to = this.opp(this.to);
     }
+    this.seq++
     return {ok: true, placedIdx: i};
   }
 
