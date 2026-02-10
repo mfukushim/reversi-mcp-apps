@@ -96,7 +96,9 @@ export class MyMCP extends McpAgent<Env, State, {}> {
       {
         title: "Get the current board state",
         description: "Get the current board state",
-        _meta: { ui: { resourceUri } }
+        _meta: {
+          ui: { resourceUri }
+        }
       },
       (extra: RequestHandlerExtra<ServerRequest, ServerNotification>) => {
         console.log('extra:',JSON.stringify(extra,null,2))
@@ -163,7 +165,9 @@ export class MyMCP extends McpAgent<Env, State, {}> {
         inputSchema: {
           move: z.string().describe('Where to place the white stone. Specify one of A1 to H8. Pass to PASS.'),
         },
-        _meta: { ui: { resourceUri } }
+        _meta: {
+          ui: { resourceUri }
+        }
       },
       ({move},extra: RequestHandlerExtra<ServerRequest, ServerNotification>) => {
         console.log('extra:',JSON.stringify(extra,null,2))

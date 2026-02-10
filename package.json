@@ -10,13 +10,13 @@
   "license": "MIT",
   "scripts": {
     "deploy": "wrangler deploy",
-    "dev": "wrangler dev",
+    "dev": "cross-env NODE_ENV=development npm run build && wrangler dev",
     "build": "pnpm run build:view &&cpy dist_view/mcp-app.html mcp/rule-logic/board.html",
     "build:view": "tsc --noEmit && cross-env INPUT=mcp-app.html vite build",
     "cpy": "cpy dist_view/mcp-app.html mcp/rule-logic/board.html",
     "build2": "tsc --noEmit && cross-env INPUT=mcp-app.html vite build && bun build index.ts --outdir \"dist_view\" --format esm --target node --external \"./server.js\" --external \"cloudflare:email\" --external \"cloudflare:workers\" --banner \"#!/usr/bin/env node\"",
     "cf-typegen": "wrangler types",
-    "start": "cross-env NODE_ENV=development npm run build && wrangler dev",
+    "start": "wrangler dev",
     "type-check": "tsc --noEmit",
     "inspect": "npx @modelcontextprotocol/inspector --config mcp-config.json --server reversi",
     "prepublishOnly": "npm run build"

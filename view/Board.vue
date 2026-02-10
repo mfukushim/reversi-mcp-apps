@@ -1,11 +1,9 @@
 <template>
-  <article class="wrap" :style="hostContext?.safeAreaInsets && {
+  <article ref="baseApp" class="wrap" :style="hostContext?.safeAreaInsets && {
       paddingTop: hostContext.safeAreaInsets.top + 'px',
       paddingRight: hostContext.safeAreaInsets.right + 'px',
       paddingBottom: hostContext.safeAreaInsets.bottom + 'px',
       paddingLeft: hostContext.safeAreaInsets.left + 'px',
-      width: '600px',
-      height: getBoardHeight
     }">
     <div v-if="!gameDisabled">
     <div class="header">
@@ -75,6 +73,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type {Cell, Color, ExportState, State} from "../Def.ts";
 
 const app = ref<App | null>(null);
+const baseApp = ref<HTMLElement | null>(null);
 const hostContext = ref<McpUiHostContext | undefined>();
 
 interface PlayResult {
@@ -215,9 +214,12 @@ const turnText = computed(() => {
   return state.value.to === 'B' ? '黒(B)' : '白(W)'
 })
 
-const getBoardHeight = computed(() => {
-  return gameDisabled.value ? '50px': '650px'
-})
+// width: '600px',
+//     height: getBoardHeight
+
+// const getBoardHeight = computed(() => {
+//   return gameDisabled.value ? '50px': '650px'
+// })
 
 
 const topGuides = Array.from({ length: 8 }, (_, i) => String.fromCharCode(65 + i))
@@ -313,6 +315,7 @@ async function clickCell(coord:string) {
   }
 }
 
+/*
 async function restoreGame() {
   if (!app.value) return
   gameDisabled.value = false
@@ -324,6 +327,7 @@ async function restoreGame() {
   const res = await app.value.callServerTool({ name: "restore-game", arguments: { state: state.value,gameSession:gameSession.value } });
   await remoteLog('Restored game2:', res)
 }
+*/
 
 watchEffect(() => {
   const ctx = hostContext.value;
@@ -340,13 +344,16 @@ watchEffect(() => {
 });
 
 onMounted(async () => {
-  const instance = new App({ name: "Reversi App", version: "1.0.0" });
+  await remoteLog('logStart:')
+  const instance = new App({ name: "Reversi App", version: "1.0.0" },{},{autoResize:false});
+  gameDisabled.value = false
+  done.value = false
+  clickDisabled.value = false
   instance.ontoolinput = async (params) => {
     console.info("Received tool call input:", params);
   };
-
   instance.ontoolresult = async (result) => {
-    // console.info("Received tool call result:", result);
+    console.info("Received tool call result:", result);
     if (result.structuredContent?.board) {
       state.value = engine.import(result.structuredContent.board as unknown as ExportState)
       recentGameState.value = result.structuredContent.board as unknown as ExportState
@@ -355,7 +362,14 @@ onMounted(async () => {
       gameSession.value = result.structuredContent.gameSession as string
     }
     const currentState = await importBoard()
-    if(currentState && currentState.gameSession !== result.structuredContent?.gameSession) {
+    if(currentState?.gameSession && result.structuredContent?.gameSession && currentState.gameSession === result.structuredContent?.gameSession) {
+      gameDisabled.value = false
+      done.value = false
+      clickDisabled.value = false
+      state.value = engine.import(currentState.board)
+      recentGameState.value = currentState.board
+    } else {
+      console.log('Game session mismatch, disabling game',currentState?.gameSession,result.structuredContent?.gameSession)
       gameDisabled.value = true
     }
   };
@@ -370,10 +384,20 @@ onMounted(async () => {
     hostContext.value = { ...hostContext.value, ...params };
   };
 
-  await instance.connect();
+  await instance.connect(undefined,{});
   app.value = instance;
   hostContext.value = instance.getHostContext();
-
+  console.log('hostContext:', hostContext.value)
+  if (baseApp.value) {
+    const { width, height } = baseApp.value?.getBoundingClientRect();
+    console.log('width:', width, 'height:', height)
+    app.value.sendSizeChanged({ height:Math.floor(height*1.2) });
+  }
+  // const newMode = 'pip';
+  // if (hostContext.value?.availableDisplayModes?.includes(newMode)) {
+  //   const result = await app.value.requestDisplayMode({ mode: newMode });
+  //   console.log("fullscreen", result);
+  // }
 })
 </script>
 
@@ -384,7 +408,8 @@ onMounted(async () => {
 
 .wrap {
   --gap: clamp(2px, 1.2vw, 10px);
-  max-width: 720px;
+  max-width: 500px;
+  max-height: 550px;
   margin: 0 auto;
   padding: 12px;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans JP", sans-serif;
