@@ -44,7 +44,7 @@ Please configure the following MCP settings on each MCP client.
   "mcpServers": {
     "reversi": {
       "type": "streamable-http",
-      "url": "https://reversi-mcp-apps.daisycodes.workers.dev"
+      "url": "https://reversi-mcp-apps.daisycodes.workers.dev/mcp"
     }
   }
 }
