@@ -23,3 +23,12 @@ export type State = {
   gameSession: string;
   currentSeq: number;
 };
+
+export type PlayResult = {
+  ok: boolean
+  error?: string
+  reset?: boolean
+  pass?: boolean
+  placedIdx?: number
+  flips?: number[]
+}

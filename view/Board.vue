@@ -70,138 +70,12 @@ import {
   type McpUiHostContext,
 } from "@modelcontextprotocol/ext-apps";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import type {Cell, Color, ExportState, State} from "../Def.ts";
+import type {ExportState, State} from "../Def.ts";
+import {ReversiEngine} from "../mcp/rule-logic/reversi.ts";
 
 const app = ref<App | null>(null);
 const baseApp = ref<HTMLElement | null>(null);
 const hostContext = ref<McpUiHostContext | undefined>();
-
-interface PlayResult {
-  ok: boolean
-  error?: string
-  reset?: boolean
-  pass?: boolean
-  placedIdx?: number
-  flips?: number[]
-}
-
-class ReversiEngine {
-  private b: Cell[] = []
-  private to: Color = 'B'
-  private seq: number = 0
-
-  init() {
-    this.b = Array(64).fill('.')
-    // 初期配置
-    this.b[27] = 'W'; this.b[28] = 'B'
-    this.b[35] = 'B'; this.b[36] = 'W'
-    this.to = 'B'
-    this.seq = 0
-    return this.export()
-  }
-
-  import(state: { board: string; to: string, seq:number }) {
-    if (!state || state.board.length !== 64) {
-      throw new Error('board は64文字の文字列である必要があります')
-    }
-    if (state.to !== 'B' && state.to !== 'W') {
-      throw new Error("to は 'B' または 'W'")
-    }
-    const arr: Cell[] = []
-    for (let i = 0; i < 64; i++) {
-      const ch = state.board[i]
-      if (ch !== '.' && ch !== 'B' && ch !== 'W') throw new Error('board に不正な文字があります')
-      arr.push(ch)
-    }
-    this.b = arr
-    this.to = state.to
-    this.seq = state.seq
-    return this.export()
-  }
-
-  export(): ExportState {
-    const { black, white } = this.counts()
-    return { board: this.b.join(''), to: this.to, legal: this.legalMoves(this.to), black, white ,seq:this.seq}
-  }
-
-  opp(c: string) { return c === 'B' ? 'W' : 'B' }
-
-  idx(coord: string) { return (coord.charCodeAt(1) - 49) * 8 + (coord.charCodeAt(0) - 65) }
-
-  rc(i: number) { return [Math.floor(i / 8), i % 8] }
-
-  coord(i: number) { return String.fromCharCode(65 + (i % 8)) + String.fromCharCode(49 + Math.floor(i / 8)) }
-
-  counts() {
-    let b = 0, w = 0
-    for (const x of this.b) {
-      if (x === 'B') b++
-      else if (x === 'W') w++
-    }
-    return { black: b, white: w }
-  }
-
-  legalMoves(color: string) {
-    const res = []
-    for (let i = 0; i < 64; i++) {
-      if (this.b[i] !== '.') continue
-      if (this.flips(i, color).length > 0) res.push(this.coord(i))
-    }
-    return res
-  }
-
-  flips(i: number, color: string) {
-    if (this.b[i] !== '.') return []
-    const [r, c] = this.rc(i), opp = this.opp(color)
-    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]
-    const res = []
-    for (const [dr, dc] of dirs) {
-      let rr = r + dr, cc = c + dc
-      const tmp = []
-      while (rr >= 0 && rr < 8 && cc >= 0 && cc < 8 && this.b[rr * 8 + cc] === opp) {
-        tmp.push(rr * 8 + cc)
-        rr += dr
-        cc += dc
-      }
-      if (rr >= 0 && rr < 8 && cc >= 0 && cc < 8 && this.b[rr * 8 + cc] === color && tmp.length) {
-        res.push(...tmp)
-      }
-    }
-    return res
-  }
-
-  playBlack(move: string) {
-    return this.play('B', move)
-  }
-
-  play(to: string, coord: string): PlayResult {
-    if (coord === 'NEW') {
-      this.init() // 盤面初期化 手番は黒
-      return { ok: true, reset: true }
-    }
-    if (to !== this.to) {
-      return { ok: false, error: 'Invalid turn' }
-    }
-    if (coord === 'PASS') {
-      const leg = this.legalMoves(this.to)
-      if (leg.length) return { ok: false, error: 'There are still legal options.' }
-      this.to = this.opp(this.to)
-      this.seq++
-      return { ok: true, pass: true }
-    }
-    if (!/^[A-H][1-8]$/.test(coord)) return { ok: false, error: 'Invalid coordinates.' }
-    const i = this.idx(coord)
-    if (this.b[i] !== '.') return { ok: false, error: 'There is already a stone.' }
-    const flips = this.flips(i, this.to)
-    if (!flips.length) return { ok: false, error: "Can't flip stones." }
-    this.b[i] = this.to
-    for (const j of flips) this.b[j] = this.to
-    this.to = this.opp(this.to)
-    if (this.legalMoves(this.to).length === 0) this.to = this.opp(this.to) // 相手に手が無ければ自動パス
-    this.seq++
-    return { ok: true, placedIdx: i, flips }
-  }
-}
 
 const engine = new ReversiEngine()
 const state = ref<ExportState>({} as ExportState)
@@ -349,6 +223,10 @@ onMounted(async () => {
   gameDisabled.value = false
   done.value = false
   clickDisabled.value = false
+  instance.onteardown = async (params) => {
+    console.info(`App is being torn down.${params}`);
+    return {}
+  }
   instance.ontoolinput = async (params) => {
     console.info("Received tool call input:", params);
   };

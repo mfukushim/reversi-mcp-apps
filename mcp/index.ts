@@ -6,7 +6,7 @@ import {z} from "zod";
 import {registerAppResource, registerAppTool, RESOURCE_MIME_TYPE} from "@modelcontextprotocol/ext-apps/server";
 import type {CallToolResult, ServerNotification, ServerRequest} from "@modelcontextprotocol/sdk/types.js";
 import type {RequestHandlerExtra} from "@modelcontextprotocol/sdk/shared/protocol.js";
-import {ExportStateSchema, type State} from "../Def.ts";
+import {type ExportState, type State} from "../Def.ts";
 
 
 const resourceUri = "ui://reversi-mcp-ui/game-board";
@@ -78,7 +78,7 @@ export class MyMCP extends McpAgent<Env, State, {}> {
       "new-game",
       {
         title: "Start a new Reversi game",
-        description: "Start a new Reversi game",
+        description: "Start a new Reversi game and show the board to the user.",
         inputSchema: {},
         _meta: { ui: { resourceUri: resourceUri } }
       },
@@ -95,7 +95,21 @@ export class MyMCP extends McpAgent<Env, State, {}> {
       "get-board",
       {
         title: "Get the current board state",
-        description: "Get the current board state",
+        description: "Get the current board state.",
+        _meta: {
+          ui: { }
+        }
+      },
+      (_: RequestHandlerExtra<ServerRequest, ServerNotification>) => {
+        // console.log('extra:',JSON.stringify(extra,null,2))
+        return this.makeMessage(this.boardInfo())
+      },
+    );
+    registerAppTool(this.server,
+      "show-board",
+      {
+        title: "Get the current board state",
+        description: "Get the current board state and show the board to the user.",
         _meta: {
           ui: { resourceUri }
         }
@@ -109,7 +123,7 @@ export class MyMCP extends McpAgent<Env, State, {}> {
       "select-user",
       {
         title: "User move a stone",
-        description: "User move a stone",
+        description: "User move a stone. Do not use. The user moves the stone directly using other methods.",
         inputSchema: {
           move: z.string().describe('Where to place the black stone. Specify one of A1 to H8. Pass to PASS.'),
           gameSession: z.string().optional(),
@@ -159,7 +173,7 @@ export class MyMCP extends McpAgent<Env, State, {}> {
       "select-assistant",
       {
         title: "Assistant move a stone",
-        description: "Assistant move a stone",
+        description: "Assistant move a stone and show the board to the user.",
         inputSchema: {
           move: z.string().describe('Where to place the white stone. Specify one of A1 to H8. Pass to PASS.'),
         },
@@ -191,21 +205,19 @@ export class MyMCP extends McpAgent<Env, State, {}> {
       "restore-game",
       {
         title: "Restore game",
-        description: "Restore a game from a previous state",
+        description: "Restore a game from a previous state and show the board to the user. Do not use.",
         inputSchema: {
-          state: ExportStateSchema.describe('Where to place the black stone. Specify one of A1 to H8. Pass to PASS.'),
+          state: z.any().describe('Game board state.'),
           gameSession: z.string().optional(),
         },
-        _meta: { }
+        _meta: { resourceUri }
       },
       ({state,gameSession},_: RequestHandlerExtra<ServerRequest, ServerNotification>) => {
-        // console.log('gameSession:',gameSession)
-        // console.log('state:',JSON.stringify(state,null,2))
-        // console.log('extra:',JSON.stringify(extra,null,2),gameSession)
+        const stateInner = state as ExportState
         try {
           const engine = new ReversiEngine()
-          engine.import(state)
-          this.setState({board:{...state},gameSession:gameSession || this.state.gameSession,currentSeq:state.seq})
+          engine.import(stateInner)
+          this.setState({board:{...stateInner},gameSession:gameSession || this.state.gameSession,currentSeq:stateInner.seq})
         } catch (e: any) {
           console.log('error:', e.toString())
         }
