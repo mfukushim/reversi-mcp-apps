@@ -105,20 +105,20 @@ export class MyMCP extends McpAgent<Env, State, {}> {
         return this.makeMessage(this.boardInfo())
       },
     );
-    registerAppTool(this.server,
-      "show-board",
-      {
-        title: "Get the current board state",
-        description: "Get the current board state and show the board to the user.",
-        _meta: {
-          ui: { resourceUri }
-        }
-      },
-      (_: RequestHandlerExtra<ServerRequest, ServerNotification>) => {
-        // console.log('extra:',JSON.stringify(extra,null,2))
-        return this.makeMessage(this.boardInfo()+this.noRepresents)
-      },
-    );
+    // registerAppTool(this.server,
+    //   "show-board",
+    //   {
+    //     title: "Get the current board state",
+    //     description: "Get the current board state and show the board to the user.",
+    //     _meta: {
+    //       ui: { resourceUri }
+    //     }
+    //   },
+    //   (_: RequestHandlerExtra<ServerRequest, ServerNotification>) => {
+    //     // console.log('extra:',JSON.stringify(extra,null,2))
+    //     return this.makeMessage(this.boardInfo()+this.noRepresents)
+    //   },
+    // );
     registerAppTool(this.server,
       "select-user",
       {

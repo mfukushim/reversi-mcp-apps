@@ -40,7 +40,7 @@ Cloudflare workersでのデモを以下で公開しています。
   "mcpServers": {
     "reversi": {
       "type": "streamable-http",
-      "url": "https://reversi-mcp-apps.daisycodes.workers.dev"
+      "url": "https://reversi-mcp-apps.daisycodes.workers.dev/mcp"
     }
   }
 }
