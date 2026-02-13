@@ -4,7 +4,9 @@
 
 English / [Japanese](./README_jp.md)  
 
-> Migrating from https://github.com/mfukushim/reversi-mcp-ui. 
+> Migrating from https://github.com/mfukushim/reversi-mcp-ui.
+
+> Reversi was available on Goose MCP client  
 
 This is a simple Reversi game that uses MCP Apps.
 You can control your turn (fixed to black) by clicking on the screen.
@@ -23,6 +25,7 @@ The structure is relatively simple, so we believe it can be used as a reference 
 
 Currently, we have confirmed that it works with Claude Desktop for Windows.  
 Since it complies with the MCP Apps specifications, it is likely to work with clients that support MCP Apps.  
+> reversi works with Goose MCP client.  
 Avatar-Shell will also be compatible with MCP Apps soon.  
 
 
