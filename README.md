@@ -25,8 +25,9 @@ The structure is relatively simple, so we believe it can be used as a reference 
 
 Currently, we have confirmed that it works with Claude Desktop for Windows.  
 Since it complies with the MCP Apps specifications, it is likely to work with clients that support MCP Apps.  
-> reversi works with Goose MCP client.  
-Avatar-Shell will also be compatible with MCP Apps soon.  
+
+> reversi works with Goose MCP client.
+> It also works experimentally with Avatar-Shell  
 
 
 > Note: This MCP server outputs HTML data using the ui:// schema for each screen and each move. When you first start using it, please check for unexpected token consumption.  
