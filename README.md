@@ -4,7 +4,7 @@
 
 English / [Japanese](./README_jp.md)  
 
-> Migrating from https://github.com/mfukushim/reversi-mcp-ui.
+> Migrate from https://github.com/mfukushim/reversi-mcp-ui.  
 
 > Reversi was available on Goose MCP client  
 
@@ -130,6 +130,8 @@ This mostly follows the instructions for running and debugging Cloudflare MCPAge
 ```shell
 pnpm install # install
 
+pnpm run cf-typegen # generate cloudflare types
+
 pnpm run dev # start dev server
 
 pnpm run inspector # start inspector
@@ -140,3 +142,4 @@ pnpm run deploy # deploy to cloudflare workers
 
 ## Guide (Japanese)  
 
+https://note.com/marble_walkers/n/n79768bd08077  

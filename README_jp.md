@@ -3,7 +3,7 @@
 
 Japanese / [English](./README.md)
 
-> https://github.com/mfukushim/reversi-mcp-ui からマイグレーション中です。
+> https://github.com/mfukushim/reversi-mcp-ui からの移植版です。
 
 自分の手番(黒固定)を画面上のクリックで操作できます。  
 
@@ -124,6 +124,8 @@ Cloudflare MCPAgent での動作するように拡張しています。
 ```shell
 pnpm install # install
 
+pnpm run cf-typegen # generate cloudflare types
+
 pnpm run dev # start dev server
 
 pnpm run inspector # start inspector
@@ -134,3 +136,4 @@ pnpm run deploy # deploy to cloudflare workers
 
 ## ガイド  
 
+https://note.com/marble_walkers/n/n79768bd08077  
