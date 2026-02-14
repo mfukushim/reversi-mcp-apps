@@ -136,4 +136,6 @@ pnpm run deploy # deploy to cloudflare workers
 
 ## ガイド  
 
-https://note.com/marble_walkers/n/n79768bd08077  
+https://note.com/marble_walkers/n/n79768bd08077  (日本語)  
+
+https://medium.com/@cubeletmoon/reversi-mcp-apps-rewriting-reversi-mcp-ui-for-mcp-apps-4a28ede5685b  (英語機械翻訳)  
