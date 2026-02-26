@@ -35,6 +35,22 @@ Cloudflare workersでのデモを以下で公開しています。
 
 各MCPクライアントで以下のMCP設定を行ってください。  
 
+- Claude Desktop(oauth必須MCPクライアント)  
+```json
+{
+  "mcpServers": {
+    "submarine": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://reversi-mcp-apps.daisycodes.workers.dev/mcp"
+      ]
+    }
+  }
+}
+```
+
+- oauth必須ではないMCPクライアント (Goose, Avatar-Shell等)  
 ```json
 {
   "mcpServers": {
@@ -65,6 +81,22 @@ npm run dev # run wrangler local
 
 各MCPクライアントで以下のMCP設定を行ってください。
 
+- Claude Desktop(oauth必須MCPクライアント)
+```json
+{
+  "mcpServers": {
+    "reversi": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "http://localhost:8787/mcp"
+      ]
+    }
+  }
+}
+```
+
+- oauth必須ではないMCPクライアント (Goose, Avatar-Shell等)
 ```json
 {
   "mcpServers": {

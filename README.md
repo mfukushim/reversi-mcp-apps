@@ -43,6 +43,22 @@ A demo using Cloudflare workers is available below.
 
 Please configure the following MCP settings on each MCP client.
 
+- Claude Desktop(oauth required MCP client)
+```json
+{
+  "mcpServers": {
+    "reversi": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://reversi-mcp-apps.daisycodes.workers.dev/mcp"
+      ]
+    }
+  }
+}
+```
+
+- MCP clients that do not require OAuth (Goose, Avatar-Shell, etc.)
 ```json
 {
   "mcpServers": {
@@ -73,6 +89,22 @@ npm run dev # run wrangler local
 
 Please configure the following MCP settings on each MCP client.  
 
+- Claude Desktop(oauth required MCP client)
+```json
+{
+  "mcpServers": {
+    "reversi": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "http://localhost:8787/mcp"
+      ]
+    }
+  }
+}
+```
+
+- MCP clients that do not require OAuth (Goose, Avatar-Shell, etc.)
 ```json
 {
   "mcpServers": {
